@@ -15,7 +15,7 @@ var api = new MikroApi({
   username: 'admin',
   password: 'xxx',
   tls: {
-    rejectUnauthorized: false // don't do this
+    rejectUnauthorized: false // maybe don't do this
   }
 })
 
@@ -25,7 +25,7 @@ api.connect(err => {
     '.proplist': 'prefix-count,disabled,state,uptime,remote-as,remote-address'
   }, (err, res) => {
     if (err) throw err
-    cb()
+    console.log(res)
   })
 })
 ```
