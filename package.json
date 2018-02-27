@@ -1,6 +1,6 @@
 {
   "name": "mikroapi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimalist Mikrotik API client",
   "repository": "https://github.com/jessetane/mikroapi",
   "author": "jesse.tane@gmail.com",
