@@ -79,21 +79,6 @@ module.exports = class MikroApi {
     })
   }
 
-  onclose (err) {
-    if (this.closed || !this.connection) return
-    this.connection.destroy()
-    delete this.connection
-    if (!err) err = new Error('connection timeout')
-    while (this.queue.length) this.queue.shift()(err)
-  }
-
-  close () {
-    this.closed = true
-    this.connection.destroy()
-    var err = new Error('connection closed')
-    while (this.queue.length) this.queue.shift()(err)
-  }
-
   exec (command, params, cb) {
     if (typeof params === 'function') {
       cb = params
@@ -127,6 +112,24 @@ module.exports = class MikroApi {
         response: '00' + hash.digest('hex')
       }, cb)
     })
+  }
+
+  onclose (err) {
+    if (this.closed || !this.connection) return
+    if (!err) err = new Error('connection timeout')
+    this.teardown(err)
+  }
+
+  close () {
+    this.closed = true
+    this.teardown(new Error('connection closed'))
+  }
+
+  teardown (err) {
+    clearTimeout(this.timer)
+    this.connection.destroy()
+    delete this.connection
+    while (this.queue.length) this.queue.shift()(err)
   }
 
   encodeLength (word) {
