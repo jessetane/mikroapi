@@ -3,9 +3,9 @@ var tls = require('tls')
 var crypto = require('crypto')
 
 module.exports = class MikroApi {
-  constructor (opts) {
+  constructor (opts = {}) {
+    opts.timeout = opts.timeout || 5000
     this.opts = opts
-    this.queue = []
   }
 
   connect (cb) {
@@ -14,20 +14,19 @@ module.exports = class MikroApi {
     } else {
       delete this.closed
     }
+    this.queue = [cb]
     this.connection = this.opts.tls
       ? tls.connect(this.opts.port, this.opts.host, this.opts.tls)
       : net.connect(this.opts.port, this.opts.host)
-    this.connection.on('connect', () => this.login(cb))
-    this.connection.on('close', () => {
-      if (this.closed) return
-      delete this.connection
-      this.connect()
-    })
+    this.connection.on('error', err => this.onclose(err))
+    this.connection.on('close', () => this.onclose())
+    this.connection.on('connect', () => this.login())
     var buffer = ''
     var state = null
     var response = null
     var attributes = null
     this.connection.on('data', data => {
+      clearTimeout(this.timer)
       buffer += data
       while (buffer.length) {
         var length = this.decodeLength(buffer)
@@ -80,9 +79,19 @@ module.exports = class MikroApi {
     })
   }
 
+  onclose (err) {
+    if (this.closed || !this.connection) return
+    this.connection.destroy()
+    delete this.connection
+    if (!err) err = new Error('connection timeout')
+    while (this.queue.length) this.queue.shift()(err)
+  }
+
   close () {
     this.closed = true
     this.connection.destroy()
+    var err = new Error('connection closed')
+    while (this.queue.length) this.queue.shift()(err)
   }
 
   exec (command, params, cb) {
@@ -99,9 +108,14 @@ module.exports = class MikroApi {
     }
     sentence += '\x00'
     this.connection.write(sentence)
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => {
+      this.connection.destroy()
+    }, this.opts.timeout)
   }
 
-  login (cb) {
+  login () {
+    var cb = this.queue.shift()
     this.exec('/login', (err, res) => {
       if (err) return cb(err)
       var hash = crypto.createHash('MD5')
