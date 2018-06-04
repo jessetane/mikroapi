@@ -88,7 +88,8 @@ module.exports = class MikroApi {
     var sentence = ''
     sentence += this.encodeLength(command) + command
     for (var key in params) {
-      var word = '=' + key + '=' + params[key]
+      var word = key + '=' + params[key]
+      if (key[0] !== '?') word = '=' + word
       sentence += this.encodeLength(word) + word
     }
     sentence += '\x00'
