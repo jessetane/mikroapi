@@ -25,7 +25,7 @@ class MikroApi {
 		if (this.connection) return
 		delete this.closed
 		const p = new Deferred()
-		this.queue = []
+		this.queue = [p]
 		this.connection = this.opts.tls
 			? tls.connect(this.opts.port, this.opts.host, this.opts.tls)
 			: net.connect(this.opts.port, this.opts.host)
@@ -33,6 +33,7 @@ class MikroApi {
 		this.connection.on('close', this.onclose)
 		this.connection.on('data', this.ondata)
 		this.connection.on('connect', async () => {
+			this.queue.shift()
 			try {
 				const res = await this.login()
 				p.resolve()
@@ -40,6 +41,9 @@ class MikroApi {
 				p.reject(err)
 			}
 		})
+		this.timer = setTimeout(() => {
+			this.connection.destroy()
+		}, this.opts.timeout)
 		return p
 	}
 
