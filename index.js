@@ -29,13 +29,16 @@ class MikroApi {
 		this.connection = this.opts.tls
 			? tls.connect(this.opts.port, this.opts.host, this.opts.tls)
 			: net.connect(this.opts.port, this.opts.host)
-		this.connection.on('error', this.onclose)
-		this.connection.on('close', this.onclose)
 		this.connection.on('data', this.ondata)
+		this.connection.on('close', this.onclose)
+		this.connection.on('error', this.onclose)
 		this.connection.on('connect', async () => {
 			this.queue.shift()
 			try {
-				const res = await this.login()
+				const res = await this.exec('/login', {
+					name: this.opts.username,
+					password: this.opts.password
+				})
 				p.resolve()
 			} catch (err) {
 				p.reject(err)
@@ -45,6 +48,30 @@ class MikroApi {
 			this.connection.destroy()
 		}, this.opts.timeout)
 		return p
+	}
+
+	exec (command, params) {
+		const p = new Deferred()
+		this.queue.push(p)
+		this.connection.write(this.encodeLength(command))
+		this.connection.write(command)
+		for (var key in params) {
+			var word = key + '=' + params[key]
+			if (key[0] !== '?') word = '=' + word
+			this.connection.write(this.encodeLength(word))
+			this.connection.write(word)
+		}
+		this.connection.write('\x00')
+		clearTimeout(this.timer)
+		this.timer = setTimeout(() => {
+			this.connection.destroy()
+		}, this.opts.timeout)
+		return p
+	}
+
+	close () {
+		this.closed = true
+		this.teardown(new Error('connection closed'))
 	}
 
 	ondata (data) {
@@ -106,41 +133,10 @@ class MikroApi {
 		}
 	}
 
-	exec (command, params) {
-		const p = new Deferred()
-		this.queue.push(p)
-		this.connection.write(this.encodeLength(command))
-		this.connection.write(command)
-		for (var key in params) {
-			var word = key + '=' + params[key]
-			if (key[0] !== '?') word = '=' + word
-			this.connection.write(this.encodeLength(word))
-			this.connection.write(word)
-		}
-		this.connection.write('\x00')
-		clearTimeout(this.timer)
-		this.timer = setTimeout(() => {
-			this.connection.destroy()
-		}, this.opts.timeout)
-		return p
-	}
-
-	async login () {
-		return this.exec('/login', {
-			name: this.opts.username,
-			password: this.opts.password
-		})
-	}
-
 	onclose (err) {
 		if (this.closed || !this.connection) return
 		if (!err) err = new Error('connection timeout')
 		this.teardown(err)
-	}
-
-	close () {
-		this.closed = true
-		this.teardown(new Error('connection closed'))
 	}
 
 	teardown (err) {
