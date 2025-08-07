@@ -75,7 +75,6 @@ class MikroApi {
 	}
 
 	ondata (data) {
-		clearTimeout(this.timer)
 		this.buffer += data
 		while (this.buffer.length) {
 			let length = this.decodeLength(this.buffer)
@@ -88,6 +87,7 @@ class MikroApi {
 					this.response.push(this.attributes)
 					this.attributes = null
 				} else {
+					clearTimeout(this.timer)
 					const res = Array.isArray(this.response) ? this.response : this.attributes
 					this.response = this.attributes = null
 					const p = this.queue.shift()
